@@ -5,6 +5,21 @@
 [![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/goktugtunc-2212s-projects/v0-ai-contract-signing)
 [![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/YAYHhjvyRZZ)
 
+AI Contract Signing • Algorand + IPFS (Pinata)
+
+A minimal dApp to draft contracts with AI, export to PDF, optionally pin to IPFS via Pinata, and anchor a proof on Algorand by storing the CID (or a document hash) on-chain.
+
+Team
+
+Team Name: HackStack
+
+Team Members
+
+Ezgin Akyürek — ezgincapkan64@gmail.com
+
+Göktuğ Tunç — gktgtunc@gmail.com
+
+
 ## Overview
 
 This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
