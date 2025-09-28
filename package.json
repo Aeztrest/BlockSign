@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@google/generative-ai": "latest",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -51,6 +52,7 @@
     "lute-connect": "latest",
     "next": "14.2.16",
     "next-themes": "latest",
+    "pdf-lib": "latest",
     "react": "^18",
     "react-day-picker": "9.8.0",
     "react-dom": "^18",
@@ -61,6 +63,7 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
+    "web3.storage": "latest",
     "zod": "3.25.67"
   },
   "devDependencies": {

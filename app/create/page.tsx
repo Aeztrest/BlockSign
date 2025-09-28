@@ -20,9 +20,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bot, FileText, Loader2, CheckCircle, AlertTriangle, Upload, Zap, Plus, X, Send } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { WalletGuard } from "@/components/wallet-guard"
+import { useWallet } from "@/lib/wallet-context"
+import { generateContract } from "@/lib/gemini"
+import { exportToPDF, downloadPDF } from "@/lib/pdf-utils"
+import { uploadToIPFS } from "@/lib/ipfs-utils"
+import { writeToAlgorand } from "@/lib/algorand-utils"
 
 export default function CreateContractPage() {
   const { toast } = useToast()
+  const { wallet } = useWallet()
   const [prompt, setPrompt] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedContract, setGeneratedContract] = useState<any>(null)
@@ -31,6 +37,16 @@ export default function CreateContractPage() {
   const [signers, setSigners] = useState<string[]>([])
   const [newSigner, setNewSigner] = useState("")
   const [inviteMessage, setInviteMessage] = useState("")
+
+  const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null)
+  const [ipfsCid, setIpfsCid] = useState<string>("")
+  const [algorandTxId, setAlgorandTxId] = useState<string>("")
+  const [stepStatuses, setStepStatuses] = useState<Record<number, "pending" | "in-progress" | "completed" | "error">>({
+    0: "pending",
+    1: "pending",
+    2: "pending",
+    3: "pending",
+  })
 
   // Structured fields
   const [parties, setParties] = useState([{ name: "", address: "" }])
@@ -46,50 +62,6 @@ export default function CreateContractPage() {
     { title: "Algorand", description: "Zincire yaz", icon: Zap },
   ]
 
-  const mockGeneratedContract = {
-    contract: `# FREELANCE YAZILIM GELİŞTİRME SÖZLEŞMESİ
-
-## TARAFLAR
-**İşveren:** Ahmet Yılmaz (ALGO...7X9K)
-**Geliştirici:** Mehmet Kaya (ALGO...2M4P)
-
-## PROJE KAPSAMI
-Bu sözleşme kapsamında geliştirici, işveren için web tabanlı e-ticaret platformu geliştirecektir.
-
-### Teknik Özellikler:
-- React.js ve Node.js teknolojileri
-- PostgreSQL veritabanı
-- Ödeme entegrasyonu (Stripe/PayPal)
-- Admin paneli
-- Mobil uyumlu tasarım
-
-## ÖDEME KOŞULLARI
-- **Toplam Bedel:** 50,000 TL
-- **Peşin Ödeme:** %40 (20,000 TL) - Sözleşme imzalandıktan sonra 7 gün içinde
-- **Kalan Ödeme:** %60 (30,000 TL) - Proje tesliminden sonra 15 gün içinde
-
-## TESLİM TARİHİ
-Proje 15 Nisan 2025 tarihine kadar tamamlanacaktir.
-
-## FİKRİ MÜLKİYET
-Proje kapsamında geliştirilen tüm yazılım, kod ve dokümantasyon işverenin mülkiyetinde olacaktır.
-
-## FESİH KOŞULLARI
-Her iki taraf da 30 gün önceden yazılı bildirimde bulunarak sözleşmeyi feshedebilir.`,
-    summary: [
-      "3 aylık freelance yazılım geliştirme projesi",
-      "E-ticaret platformu geliştirilecek",
-      "Toplam ödeme: 50,000 TL (%40 peşin, %60 teslimde)",
-      "Proje teslim tarihi: 15 Nisan 2025",
-      "Fikri mülkiyet hakları işverene ait",
-    ],
-    riskAnalysis: [
-      { level: "Medium", description: "Geç teslim durumunda ceza maddesi belirsiz" },
-      { level: "Low", description: "Ödeme koşulları standart ve güvenli" },
-      { level: "Low", description: "Fikri mülkiyet hakları açık şekilde tanımlanmış" },
-    ],
-  }
-
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast({
@@ -101,59 +73,122 @@ Her iki taraf da 30 gün önceden yazılı bildirimde bulunarak sözleşmeyi fes
     }
 
     setIsGenerating(true)
-    // Simulate AI generation
-    setTimeout(() => {
-      setGeneratedContract(mockGeneratedContract)
-      setIsGenerating(false)
+    setStepStatuses((prev) => ({ ...prev, 0: "in-progress" }))
+
+    try {
+      const contract = await generateContract({
+        prompt,
+        parties,
+        country,
+        currency,
+        deadline,
+        termination,
+      })
+
+      setGeneratedContract(contract)
+      setStepStatuses((prev) => ({ ...prev, 0: "completed" }))
+      setCurrentStep(0)
+
       toast({
         title: "Sözleşme Oluşturuldu",
         description: "AI tarafından sözleşme başarıyla oluşturuldu",
       })
-    }, 3000)
+    } catch (error) {
+      setStepStatuses((prev) => ({ ...prev, 0: "error" }))
+      toast({
+        title: "Hata",
+        description: error instanceof Error ? error.message : "Sözleşme oluşturulurken hata oluştu",
+        variant: "destructive",
+      })
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
-  const handleStepAction = (step: number) => {
-    switch (step) {
-      case 1: // Export to PDF
-        toast({
-          title: "PDF Oluşturuluyor",
-          description: "Sözleşme PDF formatına dönüştürülüyor...",
-        })
-        setTimeout(() => {
+  const handleStepAction = async (step: number) => {
+    try {
+      setStepStatuses((prev) => ({ ...prev, [step]: "in-progress" }))
+
+      switch (step) {
+        case 1: // Export to PDF
+          if (!generatedContract) {
+            throw new Error("Önce sözleşme oluşturmalısınız")
+          }
+
+          toast({
+            title: "PDF Oluşturuluyor",
+            description: "Sözleşme PDF formatına dönüştürülüyor...",
+          })
+
+          const pdfData = await exportToPDF(generatedContract.contract, "Sözleşme")
+          setPdfBytes(pdfData)
+          downloadPDF(pdfData, `sozlesme-${Date.now()}.pdf`)
+
+          setStepStatuses((prev) => ({ ...prev, [step]: "completed" }))
           setCurrentStep(1)
+
           toast({
             title: "PDF Hazır",
-            description: "Sözleşme PDF olarak hazırlandı",
+            description: "Sözleşme PDF olarak hazırlandı ve indirildi",
           })
-        }, 2000)
-        break
-      case 2: // Upload to IPFS
-        toast({
-          title: "IPFS'e Yükleniyor",
-          description: "Sözleşme IPFS ağına yükleniyor...",
-        })
-        setTimeout(() => {
+          break
+
+        case 2: // Upload to IPFS
+          if (!pdfBytes) {
+            throw new Error("Önce PDF oluşturmalısınız")
+          }
+
+          toast({
+            title: "IPFS'e Yükleniyor",
+            description: "Sözleşme IPFS ağına yükleniyor...",
+          })
+
+          const cid = await uploadToIPFS(pdfBytes, `contract-${Date.now()}.pdf`)
+          setIpfsCid(cid)
+
+          setStepStatuses((prev) => ({ ...prev, [step]: "completed" }))
           setCurrentStep(2)
+
           toast({
             title: "IPFS'e Yüklendi",
-            description: "Hash: QmX4K8H2N9L3P6R8T5V7W1Y3Z5A7C9E1F3H5J7L9N1P3R5T7V",
+            description: `CID: ${cid}`,
           })
-        }, 2500)
-        break
-      case 3: // Create On-chain Record
-        toast({
-          title: "Blockchain'e Yazılıyor",
-          description: "Algorand ağında kayıt oluşturuluyor...",
-        })
-        setTimeout(() => {
+          break
+
+        case 3: // Create On-chain Record
+          if (!ipfsCid) {
+            throw new Error("Önce IPFS'e yükleme yapmalısınız")
+          }
+
+          if (!wallet?.address) {
+            throw new Error("Cüzdan bağlantısı gerekli")
+          }
+
+          toast({
+            title: "Blockchain'e Yazılıyor",
+            description: "Algorand ağında kayıt oluşturuluyor...",
+          })
+
+          const txId = await writeToAlgorand(ipfsCid, wallet.address, wallet.signTransaction)
+          setAlgorandTxId(txId)
+
+          setStepStatuses((prev) => ({ ...prev, [step]: "completed" }))
           setCurrentStep(3)
+
           toast({
             title: "Blockchain Kaydı Oluşturuldu",
-            description: "TxID: TX9L3K5M7P1R3T5V7W9Y1A3C5E7G9I1K3M5O7Q9S1U3W5Y7A9C",
+            description: `TxID: ${txId}`,
           })
           setInviteDialogOpen(true)
-        }, 3000)
-        break
+          break
+      }
+    } catch (error) {
+      setStepStatuses((prev) => ({ ...prev, [step]: "error" }))
+      toast({
+        title: "Hata",
+        description: error instanceof Error ? error.message : "İşlem sırasında hata oluştu",
+        variant: "destructive",
+      })
     }
   }
 
@@ -194,6 +229,35 @@ Her iki taraf da 30 gün önceden yazılı bildirimde bulunarak sözleşmeyi fes
         return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Düşük</Badge>
       default:
         return <Badge variant="outline">{level}</Badge>
+    }
+  }
+
+  const getStepIcon = (stepIndex: number) => {
+    const status = stepStatuses[stepIndex]
+    const StepIcon = steps[stepIndex].icon
+
+    if (status === "completed") {
+      return <CheckCircle className="h-5 w-5" />
+    } else if (status === "in-progress") {
+      return <Loader2 className="h-5 w-5 animate-spin" />
+    } else if (status === "error") {
+      return <AlertTriangle className="h-5 w-5" />
+    } else {
+      return <StepIcon className="h-5 w-5" />
+    }
+  }
+
+  const getStepColor = (stepIndex: number) => {
+    const status = stepStatuses[stepIndex]
+
+    if (status === "completed") {
+      return "bg-emerald-500 text-white"
+    } else if (status === "in-progress") {
+      return "bg-blue-500 text-white"
+    } else if (status === "error") {
+      return "bg-red-500 text-white"
+    } else {
+      return "bg-muted text-muted-foreground"
     }
   }
 
@@ -395,28 +459,26 @@ Her iki taraf da 30 gün önceden yazılı bildirimde bulunarak sözleşmeyi fes
                       {steps.map((step, index) => (
                         <div key={index} className="flex items-center gap-4">
                           <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              index <= currentStep ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"
-                            }`}
+                            className={`w-10 h-10 rounded-full flex items-center justify-center ${getStepColor(index)}`}
                           >
-                            {index < currentStep ? (
-                              <CheckCircle className="h-5 w-5" />
-                            ) : (
-                              <step.icon className="h-5 w-5" />
-                            )}
+                            {getStepIcon(index)}
                           </div>
                           <div className="flex-1">
                             <h4 className="font-medium">{step.title}</h4>
                             <p className="text-sm text-muted-foreground">{step.description}</p>
+                            {index === 2 && ipfsCid && <p className="text-xs text-emerald-600 mt-1">CID: {ipfsCid}</p>}
+                            {index === 3 && algorandTxId && (
+                              <p className="text-xs text-emerald-600 mt-1">TxID: {algorandTxId}</p>
+                            )}
                           </div>
-                          {index > currentStep && (
+                          {stepStatuses[index] === "pending" && index > 0 && (
                             <Button size="sm" onClick={() => handleStepAction(index)}>
                               Başlat
                             </Button>
                           )}
-                          {index === currentStep && index < steps.length - 1 && (
-                            <Button size="sm" onClick={() => handleStepAction(index + 1)}>
-                              Devam Et
+                          {stepStatuses[index] === "error" && (
+                            <Button size="sm" variant="destructive" onClick={() => handleStepAction(index)}>
+                              Tekrar Dene
                             </Button>
                           )}
                         </div>
