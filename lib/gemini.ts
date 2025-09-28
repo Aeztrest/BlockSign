@@ -34,7 +34,7 @@ export async function generateContract(params: ContractParams): Promise<Generate
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flush" })
 
     const contractPrompt = `
 Aşağıdaki bilgilere göre detaylı bir Türkçe sözleşme oluştur:
