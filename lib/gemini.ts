@@ -1,3 +1,5 @@
+import { GoogleGenerativeAI } from "@google/generative-ai"
+
 interface ContractParams {
   prompt: string
   parties: Array<{ name: string; address: string }>
@@ -47,18 +49,16 @@ function detectLanguage(text?: string): "tr" | "en" {
 /** helper: try to unescape common JSON-escaped sequences so text becomes readable */
 function unescapeText(s: string) {
   if (!s) return s
-  return (
-    s
-      .replace(/\\r/g, "\r")
-      .replace(/\\n/g, "\n")
-      .replace(/\\t/g, "\t")
-      .replace(/\\"/g, '"')
-      .replace(/\\'/g, "'")
-      // decode simple \u00XX escapes
-      .replace(/\\u00([0-9A-Fa-f]{2})/g, (_m, p1) => String.fromCharCode(Number.parseInt(p1, 16)))
-      // decode full \uXXXX escapes
-      .replace(/\\u([0-9A-Fa-f]{4})/g, (_m, p1) => String.fromCharCode(Number.parseInt(p1, 16)))
-  )
+  return s
+    .replace(/\\r/g, "\r")
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t")
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    // decode simple \u00XX escapes
+    .replace(/\\u00([0-9A-Fa-f]{2})/g, (_m, p1) => String.fromCharCode(parseInt(p1, 16)))
+    // decode full \uXXXX escapes
+    .replace(/\\u([0-9A-Fa-f]{4})/g, (_m, p1) => String.fromCharCode(parseInt(p1, 16)))
 }
 
 /** extract first JSON-like substring (naive) */
@@ -108,9 +108,9 @@ function parseContractFromPlainText(text: string): GeneratedContract {
   let riskAnalysis: Array<{ level: string; description: string }> = []
 
   const summaryMatch =
-    text.match(/(?:^|\n)#{0,3}\s*ÖZET\s*[:-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i) ||
-    text.match(/(?:^|\n)#{0,3}\s*Özet\s*[:-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i) ||
-    text.match(/(?:^|\n)#{0,3}\s*SUMMARY\s*[:-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i)
+    text.match(/(?:^|\n)#{0,3}\s*ÖZET\s*[:\-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i) ||
+    text.match(/(?:^|\n)#{0,3}\s*Özet\s*[:\-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i) ||
+    text.match(/(?:^|\n)#{0,3}\s*SUMMARY\s*[:\-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i)
 
   if (summaryMatch) {
     const bullets = summaryMatch[1]
@@ -130,15 +130,11 @@ function parseContractFromPlainText(text: string): GeneratedContract {
 
   // risk extraction
   const riskMatch =
-    text.match(
-      /(?:^|\n)#{0,3}\s*(Risk Analizi|RİSK|RISK|RİSK ANALİZİ|RISK ANALYSIS)\s*[:-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i,
-    ) || text.match(/(?:^|\n)(RİSK|RISK)[\s\S]{0,200}/i)
+    text.match(/(?:^|\n)#{0,3}\s*(Risk Analizi|RİSK|RISK|RİSK ANALİZİ|RISK ANALYSIS)\s*[:\-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i) ||
+    text.match(/(?:^|\n)(RİSK|RISK)[\s\S]{0,200}/i)
 
   if (riskMatch && riskMatch[2]) {
-    const lines = riskMatch[2]
-      .split(/\n/)
-      .map((l) => l.trim())
-      .filter(Boolean)
+    const lines = riskMatch[2].split(/\n/).map((l) => l.trim()).filter(Boolean)
     for (const l of lines) {
       const m = l.match(/(High|Medium|Low|Yüksek|Orta|Mini)\s*[:\-–]\s*(.+)/i)
       if (m) {
@@ -155,8 +151,7 @@ function parseContractFromPlainText(text: string): GeneratedContract {
   }
 
   if (summary.length === 0) summary = ["Özet otomatik olarak üretilemedi."]
-  if (riskAnalysis.length === 0)
-    riskAnalysis = [{ level: "Medium", description: "Risk analizi otomatik olarak üretilemedi." }]
+  if (riskAnalysis.length === 0) riskAnalysis = [{ level: "Medium", description: "Risk analizi otomatik olarak üretilemedi." }]
 
   return { contract, summary, riskAnalysis }
 }
@@ -164,22 +159,10 @@ function parseContractFromPlainText(text: string): GeneratedContract {
 /** Normalize result object to GeneratedContract with safe defaults */
 function normalizeParsedJson(parsed: any): GeneratedContract {
   const contractRaw = parsed.contract ?? parsed.text ?? parsed.content ?? ""
-  const contract =
-    typeof contractRaw === "string"
-      ? unescapeText(contractRaw)
-          .replace(/^"(.*)"$/s, "$1")
-          .trim()
-      : JSON.stringify(contractRaw)
-  const summaryArr = Array.isArray(parsed.summary)
-    ? parsed.summary.map(String)
-    : parsed.summary
-      ? [String(parsed.summary)]
-      : ["Özet bulunamadı"]
+  const contract = typeof contractRaw === "string" ? unescapeText(contractRaw).replace(/^"(.*)"$/s, "$1").trim() : JSON.stringify(contractRaw)
+  const summaryArr = Array.isArray(parsed.summary) ? parsed.summary.map(String) : parsed.summary ? [String(parsed.summary)] : ["Özet bulunamadı"]
   const riskArr = Array.isArray(parsed.riskAnalysis)
-    ? parsed.riskAnalysis.map((r: any) => ({
-        level: String(r.level ?? "Medium"),
-        description: String(r.description ?? r),
-      }))
+    ? parsed.riskAnalysis.map((r: any) => ({ level: String(r.level ?? "Medium"), description: String(r.description ?? r) }))
     : [{ level: "Medium", description: "Risk analizi yok" }]
 
   return { contract, summary: summaryArr, riskAnalysis: riskArr }
@@ -187,25 +170,99 @@ function normalizeParsedJson(parsed: any): GeneratedContract {
 
 /** main function */
 export async function generateContract(params: ContractParams): Promise<GeneratedContract> {
-  try {
-    const response = await fetch("/api/generate-contract", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(params),
-    })
+  // prefer server-side key variables
+  const apiKey = process.env.GENAI_API_KEY || process.env.GENERATIVE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
 
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || "Sözleşme oluşturulurken hata oluştu")
+  if (!apiKey) {
+    // dev fallback
+    return {
+      contract: `# FREELANCE YAZILIM GELİŞTİRME SÖZLEŞMESİ\n\n## TARAFLAR\n${params.parties.map((p) => `**${p.name}:** ${p.address}`).join("\n")}\n\n## PROJE KAPSAMI\n${params.prompt}\n\n## ÖDEME KOŞULLARI\n- Para birimi: ${params.currency}\n- Ülke: ${params.country}\n\n## TESLİM TARİHİ\n${params.deadline ? `Proje ${formatDateTR(params.deadline)} tarihine kadar tamamlanacaktır.` : "Teslim tarihi belirtilmemiştir."}\n\n## FESİH KOŞULLARI\n${params.termination ? `Her iki taraf da ${params.termination} gün önceden yazılı bildirimde bulunarak sözleşmeyi feshedebilir.` : "Fesih koşulları belirtilmemiştir."}`,
+      summary: ["AI tarafından oluşturulan sözleşme", `Para birimi: ${params.currency}`, `Ülke: ${params.country}`, `${params.parties.length} taraf dahil`],
+      riskAnalysis: [{ level: "Low", description: "Geliştirme ortamında simüle edildi" }],
+    }
+  }
+
+  try {
+    const lang = detectLanguage(params.prompt) // 'tr' or 'en'
+    const langName = lang === "tr" ? "Türkçe" : "English"
+
+    const genAI = new GoogleGenerativeAI(apiKey)
+    // adjust model if you need another; keep current project model if working
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
+
+    // Compose strong instruction telling model to return JSON if possible, and respond in the detected language.
+    const contractPrompt = `
+You are a professional legal-drafting assistant. Respond in ${langName}.
+User-supplied details below (do not invent missing legal identifiers).
+Description: ${params.prompt}
+Parties: ${params.parties.map((p) => `${p.name} (${p.address || "adres yok"})`).join("; ")}
+Country: ${params.country}
+Currency: ${params.currency}
+Deadline: ${formatDateTR(params.deadline)}
+Termination (days): ${params.termination || "Belirtilmemiş"}
+
+OUTPUT INSTRUCTION (priority order):
+1) Preferably return a valid JSON object ONLY (no code fences, no extra text) with keys:
+   {
+     "contract": "<full contract as markdown or plain text>",
+     "summary": ["bullet1","bullet2",...],
+     "riskAnalysis": [{"level":"High|Medium|Low","description":"..."}]
+   }
+   If you return JSON, ensure strings are not escaped JSON-within-JSON (return real JSON).
+
+2) If you cannot return JSON, return CLEAN markdown in ${langName} with the following headings:
+   # <TITLE>
+   ## TARAFLAR (or PARTIES)
+   ## PROJE KAPSAMI (or SCOPE)
+   ## ÖDEME KOŞULLARI (or PAYMENT TERMS)
+   ## TESLİM TARİHİ (or DELIVERY DATE)
+   ## FİKRİ MÜLKİYET (or IP)
+   ## FESİH KOŞULLARI (or TERMINATION)
+   Then append:
+   ## ÖZET (or SUMMARY) - 3 to 6 bullet points
+   ## RISK ANALIZI (or RISK ANALYSIS) - up to 3 items like "High: reason"
+
+IMPORTANT:
+- If the user prompt is in Turkish, produce the contract and headings in Turkish. If in English, produce in English.
+- Do not wrap the JSON in markdown code blocks. Do not output anything other than the JSON object if you can.
+- If you cannot produce JSON, produce only the clean markdown described above.
+`
+
+    const result = await model.generateContent(contractPrompt)
+    const response = await result.response
+    const rawText = String(await response.text())
+
+    // Step 1: try to extract JSON substring and parse
+    const jsonSub = extractJsonSubstring(rawText)
+    if (jsonSub) {
+      const parsed = tryParseJsonMaybe(jsonSub)
+      if (parsed && (parsed.contract || parsed.summary || parsed.riskAnalysis)) {
+        return normalizeParsedJson(parsed)
+      }
     }
 
-    return await response.json()
-  } catch (error) {
-    console.error("Contract generation error:", error)
+    // Step 2: try parse entire rawText as JSON (maybe unescaped)
+    const tryFull = tryParseJsonMaybe(rawText)
+    if (tryFull && (tryFull.contract || tryFull.summary || tryFull.riskAnalysis)) {
+      return normalizeParsedJson(tryFull)
+    }
 
-    // Fallback response
+    // Step 3: unescape and retry JSON extraction
+    const unescaped = unescapeText(rawText)
+    const jsonSub2 = extractJsonSubstring(unescaped)
+    if (jsonSub2) {
+      const parsed2 = tryParseJsonMaybe(jsonSub2)
+      if (parsed2 && (parsed2.contract || parsed2.summary || parsed2.riskAnalysis)) {
+        return normalizeParsedJson(parsed2)
+      }
+    }
+
+    // Step 4: fallback - parse plain text / markdown into structure
+    const readable = unescaped.trim()
+    const parsedPlain = parseContractFromPlainText(readable)
+    return parsedPlain
+  } catch (error) {
+    console.error("Gemini API error (generateContract):", error)
     return {
       contract: `# UYARI: Otomatik sözleşme oluşturulamadı\n\nSistem bir hata ile karşılaşıldı; lütfen daha sonra tekrar deneyin.\n\n(Hata: ${String(error)})`,
       summary: ["Sistemsel hata nedeniyle sözleşme oluşturulamadı."],

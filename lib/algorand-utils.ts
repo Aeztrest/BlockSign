@@ -1,57 +1,46 @@
-import algosdk from "algosdk"
+import algosdk from "algosdk";
 
 export async function writeToAlgorand(
   cid: string,
   walletAddress: string,
-  signTransaction: (txns: any[]) => Promise<Uint8Array[]>,
+  signTransaction: (txns: any[]) => Promise<Uint8Array[]>
 ): Promise<string> {
   try {
-    // Create transaction locally (no API key needed for this)
-    const algodServer = "https://testnet-api.algonode.cloud"
-    const algodPort = 443
-    const algodClient = new algosdk.Algodv2("", algodServer, algodPort)
+    // Algonode public: token yok, URL env'den
+    const algodServer = process.env.NEXT_PUBLIC_ALGOD_URL ?? "https://testnet-api.algonode.cloud";
+    const algodClient = new algosdk.Algodv2("", algodServer, ""); // port boş bırakılabilir
 
-    // Get suggested parameters
-    const suggestedParams = await algodClient.getTransactionParams().do()
+    const sp = await algodClient.getTransactionParams().do();
 
-    // Create transaction with IPFS CID in note field
+    // Buffer yerine TextEncoder
+    const note = new TextEncoder().encode(cid);
+
     const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
       from: walletAddress,
-      to: walletAddress, // Self-transaction
-      amount: 0, // Zero amount
-      note: new Uint8Array(Buffer.from(cid)),
-      suggestedParams,
-    })
+      to: walletAddress,     // self-tx
+      amount: 0,             // 0 microAlgos (sadece not)
+      note,
+      suggestedParams: sp,
+    });
 
-    // Sign transaction using wallet
-    const signedTxns = await signTransaction([
-      {
-        txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString("base64"),
-      },
-    ])
+    // Wallet'e iletilecek encoded txn
+    const encoded = algosdk.encodeUnsignedTransaction(txn);
 
-    // Send to server API for processing
-    const response = await fetch("/api/algorand-transaction", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        cid,
-        walletAddress,
-        signedTxns,
-      }),
-    })
+    // ÇOĞU WALLET İÇİN (WalletConnect/Pera): base64 alan obje
+    const base64Txn =
+      typeof window !== "undefined"
+        ? btoa(String.fromCharCode(...encoded))
+        : Buffer.from(encoded).toString("base64"); // server fallback
 
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || "Algorand işlemi sırasında hata oluştu")
-    }
+    const signed = await signTransaction([{ txn: base64Txn }]); // senin connector'un böyleyse
+    // Eğer connector Uint8Array bekliyorsa:  const signed = await signTransaction([encoded]);
 
-    const { txId } = await response.json()
-    return txId
+    // Ağa gönder
+    const { txId } = await algodClient.sendRawTransaction(signed[0]).do();
+    await algosdk.waitForConfirmation(algodClient, txId, 4);
+    return txId;
   } catch (error) {
-    console.error("Algorand transaction error:", error)
-    throw new Error("Algorand işlemi sırasında hata oluştu")
+    console.error("Algorand transaction error:", error);
+    throw new Error("Algorand işlemi sırasında hata oluştu");
   }
 }
