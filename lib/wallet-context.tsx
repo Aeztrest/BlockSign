@@ -62,7 +62,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
       // Get genesis ID from Algod client
       const genesisInfo = await algodClient.genesis().do()
-      const genesisID = genesisInfo.id
+      const genesisID = `${genesisInfo.network}-${genesisInfo.id}`  // "testnet-v1.0"
 
       console.log("[v0] Genesis ID:", genesisID)
 
