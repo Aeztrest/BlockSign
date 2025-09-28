@@ -2,6 +2,8 @@
 
 import type React from "react"
 import { createContext, useContext, useState } from "react"
+import { Algodv2 } from "algosdk"
+import LuteConnect from "lute-connect"
 
 interface WalletState {
   isConnected: boolean
@@ -12,12 +14,15 @@ interface WalletState {
 
 interface WalletContextType {
   wallet: WalletState
-  connectWallet: (walletType: string) => Promise<void>
+  connectWallet: () => Promise<void>
   disconnectWallet: () => void
   signTransaction: (txData: any) => Promise<string>
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
+
+const algodClient = new Algodv2("", "https://testnet-api.algonode.cloud", "")
+const lute = new LuteConnect()
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [wallet, setWallet] = useState<WalletState>({
@@ -27,24 +32,51 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     balance: 0,
   })
 
-  // Mock wallet connection - In real implementation, use @txnlab/use-wallet
-  const connectWallet = async (walletType: string) => {
-    // Simulate wallet connection delay
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+  const connectWallet = async () => {
+    try {
+      console.log("[v0] Starting Lute wallet connection...")
 
-    // Mock successful connection
-    const mockAddress = `ALGO${Math.random().toString(36).substring(2, 8).toUpperCase()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-    const mockBalance = Math.floor(Math.random() * 1000) + 100
+      // Get genesis ID from Algod client
+      const genesisInfo = await algodClient.genesis().do()
+      const genesisID = genesisInfo.id
 
-    setWallet({
-      isConnected: true,
-      address: mockAddress,
-      walletType,
-      balance: mockBalance,
-    })
+      console.log("[v0] Genesis ID:", genesisID)
+
+      // Connect to Lute wallet with genesis ID
+      const accounts = await lute.connect(genesisID)
+
+      if (accounts && accounts.length > 0) {
+        const userAddress = accounts[0]
+        console.log("[v0] Connected to address:", userAddress)
+
+        // Get account balance
+        let balance = 0
+        try {
+          const accountInfo = await algodClient.accountInformation(userAddress).do()
+          balance = accountInfo.amount / 1000000 // Convert microAlgos to Algos
+        } catch (error) {
+          console.log("[v0] Could not fetch balance:", error)
+        }
+
+        setWallet({
+          isConnected: true,
+          address: userAddress,
+          walletType: "lute",
+          balance,
+        })
+
+        console.log("[v0] Wallet connected successfully")
+      } else {
+        throw new Error("No accounts returned from Lute")
+      }
+    } catch (error) {
+      console.error("[v0] Wallet connection error:", error)
+      throw error
+    }
   }
 
   const disconnectWallet = () => {
+    console.log("[v0] Disconnecting wallet...")
     setWallet({
       isConnected: false,
       address: null,
@@ -54,15 +86,25 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signTransaction = async (txData: any): Promise<string> => {
-    if (!wallet.isConnected) {
+    if (!wallet.isConnected || !wallet.address) {
       throw new Error("Wallet not connected")
     }
 
-    // Simulate signing delay
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    try {
+      console.log("[v0] Starting transaction signing...")
 
-    // Return mock transaction ID
-    return `TX${Math.random().toString(36).substring(2, 8).toUpperCase()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+      // Use Lute to sign the transaction
+      const signedTxn = await lute.signTransaction(txData, wallet.address)
+
+      // Submit to network
+      const txId = await algodClient.sendRawTransaction(signedTxn).do()
+
+      console.log("[v0] Transaction signed and submitted:", txId.txId)
+      return txId.txId
+    } catch (error) {
+      console.error("[v0] Transaction signing error:", error)
+      throw error
+    }
   }
 
   return (

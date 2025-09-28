@@ -115,7 +115,7 @@ export const translations = {
 
     // Dialog
     declineContract: "Sözleşmeyi Reddet",
-    declineContractDesc: "Bu sözleşmeyi reddediyor musunuz? Sebep belirtmeniz önerilir.",
+    declineContractDesc: "Bu sözleşme reddediyor musunuz? Sebep belirtmeniz önerilir.",
     declineReason: "Reddetme sebebinizi yazın...",
 
     // AI Summary
@@ -230,13 +230,15 @@ export const translations = {
 
     // Wallet Dialog
     selectWallet: "Cüzdan Seçin",
-    selectWalletDesc: "Algorand ağına bağlanmak için bir cüzdan seçin",
+    selectWalletDesc: "Algorand ağına bağlanmak için Lute cüzdanını kullanın",
     peraWallet: "Pera Wallet",
     peraWalletDesc: "Algorand'ın resmi mobil cüzdanı",
     deflyWallet: "Defly Wallet",
     deflyWalletDesc: "Gelişmiş DeFi özellikleri",
     exodusWallet: "Exodus Wallet",
     exodusWalletDesc: "Çok para birimli masaüstü cüzdanı",
+    luteWallet: "Lute Cüzdanı",
+    luteWalletDesc: "Algorand için güvenli cüzdan",
 
     // Profile Page Specific Translations
     profileTitle: "Kullanıcı Profili",
@@ -505,13 +507,15 @@ export const translations = {
 
     // Wallet Dialog
     selectWallet: "Select Wallet",
-    selectWalletDesc: "Choose a wallet to connect to the Algorand network",
+    selectWalletDesc: "Use Lute wallet to connect to the Algorand network",
     peraWallet: "Pera Wallet",
     peraWalletDesc: "Official mobile wallet of Algorand",
     deflyWallet: "Defly Wallet",
     deflyWalletDesc: "Advanced DeFi features",
     exodusWallet: "Exodus Wallet",
     exodusWalletDesc: "Multi-currency desktop wallet",
+    luteWallet: "Lute Wallet",
+    luteWalletDesc: "Secure wallet for Algorand",
 
     // Profile Page Specific Translations
     profileTitle: "User Profile",

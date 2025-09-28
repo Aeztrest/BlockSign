@@ -19,36 +19,15 @@ export function WalletConnectDialog({ open, onOpenChange }: WalletConnectDialogP
   const { toast } = useToast()
   const { language } = useLanguage()
   const { t } = useTranslation(language)
-  const [connecting, setConnecting] = useState<string | null>(null)
+  const [connecting, setConnecting] = useState(false)
 
-  const wallets = [
-    {
-      name: t("peraWallet"),
-      type: "pera",
-      description: t("peraWalletDesc"),
-      icon: "🟢",
-    },
-    {
-      name: t("deflyWallet"),
-      type: "defly",
-      description: t("deflyWalletDesc"),
-      icon: "🦋",
-    },
-    {
-      name: t("exodusWallet"),
-      type: "exodus",
-      description: t("exodusWalletDesc"),
-      icon: "🚀",
-    },
-  ]
-
-  const handleConnect = async (walletType: string, walletName: string) => {
-    setConnecting(walletType)
+  const handleConnect = async () => {
+    setConnecting(true)
     try {
-      await connectWallet(walletType)
+      await connectWallet()
       toast({
         title: language === "tr" ? "Cüzdan Bağlandı" : "Wallet Connected",
-        description: language === "tr" ? `${walletName} başarıyla bağlandı` : `${walletName} connected successfully`,
+        description: language === "tr" ? "Lute cüzdanı başarıyla bağlandı" : "Lute wallet connected successfully",
       })
       onOpenChange(false)
     } catch (error) {
@@ -59,7 +38,7 @@ export function WalletConnectDialog({ open, onOpenChange }: WalletConnectDialogP
         variant: "destructive",
       })
     } finally {
-      setConnecting(null)
+      setConnecting(false)
     }
   }
 
@@ -74,24 +53,23 @@ export function WalletConnectDialog({ open, onOpenChange }: WalletConnectDialogP
           <DialogDescription>{t("selectWalletDesc")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          {wallets.map((wallet) => (
-            <Button
-              key={wallet.type}
-              variant="outline"
-              className="w-full justify-start h-auto p-4 bg-transparent"
-              onClick={() => handleConnect(wallet.type, wallet.name)}
-              disabled={connecting !== null}
-            >
-              <div className="flex items-center gap-3 w-full">
-                <div className="text-2xl">{wallet.icon}</div>
-                <div className="flex-1 text-left">
-                  <div className="font-medium">{wallet.name}</div>
-                  <div className="text-sm text-muted-foreground">{wallet.description}</div>
+          <Button
+            variant="outline"
+            className="w-full justify-start h-auto p-4 bg-transparent"
+            onClick={handleConnect}
+            disabled={connecting}
+          >
+            <div className="flex items-center gap-3 w-full">
+              <div className="text-2xl">🎵</div>
+              <div className="flex-1 text-left">
+                <div className="font-medium">{language === "tr" ? "Lute Cüzdanı" : "Lute Wallet"}</div>
+                <div className="text-sm text-muted-foreground">
+                  {language === "tr" ? "Algorand için güvenli cüzdan" : "Secure wallet for Algorand"}
                 </div>
-                {connecting === wallet.type && <Loader2 className="h-4 w-4 animate-spin" />}
               </div>
-            </Button>
-          ))}
+              {connecting && <Loader2 className="h-4 w-4 animate-spin" />}
+            </div>
+          </Button>
         </div>
         <div className="text-center pt-4">
           <p className="text-sm text-muted-foreground">
