@@ -64,7 +64,6 @@ npm install
 Create a .env.local file:
 
 NEXT_PUBLIC_ALGOD_URL=https://testnet-api.algonode.cloud
-NEXT_PUBLIC_ALGOD_API_KEY=...
 NEXT_PUBLIC_IPFS_TOKEN=...
 PINATA_JWT=...
 
@@ -90,7 +89,7 @@ class Counter(algopy.ARC4Contract):
 
 📱 Wallet Integration
 
-Pera Wallet setup with Testnet.
+Lute Wallet setup with Testnet.
 
 Users can connect, sign, and broadcast transactions seamlessly.
 
@@ -102,9 +101,9 @@ Team Name: HackStack
 
 Members:
 
-[Your Name] – [Email]
+Ezgin Akyürek – ezgincapkan64@gmail.com
 
-[Teammate] – [Email]
+Göktuğ Tunç – gktgtunc@gmail.com
 
 🏆 Hackathon Criteria
 
