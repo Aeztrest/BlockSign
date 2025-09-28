@@ -1,23 +1,8 @@
-// lib/pdf.ts  (veya exportToPDF.ts)
-import { PDFDocument, rgb } from "pdf-lib";
+// lib/pdf.ts
+import { PDFDocument, rgb } from "pdf-lib"
+import fontkit from "@pdf-lib/fontkit" // <-- gerekli
 
-async function loadEmbeddedFont(pdfDoc: PDFDocument) {
-  // Try to load a unicode TTF from public folder
-  try {
-    const fontUrl = "/fonts/NotoSans-Regular.ttf";
-    const resp = await fetch(fontUrl);
-    if (!resp.ok) throw new Error("Font fetch failed: " + resp.status);
-    const fontBytes = await resp.arrayBuffer();
-    return await pdfDoc.embedFont(fontBytes);
-  } catch (err) {
-    console.warn("[exportToPDF] Unicode font load failed, falling back to StandardFonts (may break local chars):", err);
-    // fallback to a standard font (may not support Turkish chars)
-    return await pdfDoc.embedFont(PDFDocument.PDF_NAME ? (undefined as any) : (undefined as any)); // placeholder - we'll embed later
-  }
-}
-
-// Word wrap util: returns array of lines that fit maxWidth.
-// If a single word is longer than maxWidth, it breaks it by character.
+// Word wrap util
 function wrapTextToLines(text: string, font: any, fontSize: number, maxWidth: number): string[] {
   const paragraphs = text.replace(/\r/g, "").split("\n");
   const outLines: string[] = [];
@@ -36,7 +21,7 @@ function wrapTextToLines(text: string, font: any, fontSize: number, maxWidth: nu
         line = candidate;
       } else {
         if (line) outLines.push(line);
-        // If single word itself is too long, split it by characters
+        // If single word too long, break by characters
         if (font.widthOfTextAtSize(w, fontSize) > maxWidth) {
           let chunk = "";
           for (const ch of w) {
@@ -49,7 +34,9 @@ function wrapTextToLines(text: string, font: any, fontSize: number, maxWidth: nu
             }
           }
           if (chunk) {
-            line = chunk; // continue with rest words
+            // push remaining chunk as a line or continue
+            outLines.push(chunk);
+            line = "";
           } else {
             line = "";
           }
@@ -68,92 +55,88 @@ export async function exportToPDF(contractText: string, title = "Sözleşme"): P
   try {
     const pdfDoc = await PDFDocument.create();
 
-    // Try to embed Unicode font from public/fonts
-    let font: any = null;
+    // Register fontkit BEFORE embedding a custom font
+    pdfDoc.registerFontkit(fontkit);
+
+    // Try to fetch embedded font from public folder
+    const fontUrl = "/fonts/NotoSans-Regular.ttf";
+    let font: any;
     try {
-      const fontUrl = "/fonts/NotoSans-Regular.ttf";
-      const fResp = await fetch(fontUrl);
-      if (!fResp.ok) throw new Error("Font not found at " + fontUrl);
-      const fontBytes = await fResp.arrayBuffer();
+      const resp = await fetch(fontUrl);
+      if (!resp.ok) throw new Error("Font fetch failed: " + resp.status);
+      const fontBytes = await resp.arrayBuffer();
       font = await pdfDoc.embedFont(fontBytes);
     } catch (e) {
-      console.warn("[exportToPDF] Unicode font embed failed, will try StandardFonts (non-Unicode)", e);
-      // fallback to a standard font (may fail on Turkish chars)
+      console.warn("[exportToPDF] Unicode font embed failed, falling back to StandardFonts (may not support Turkish):", e);
+      // fallback to a standard font (non-unicode, may cause WinAnsi error on special chars)
       font = await pdfDoc.embedFont((await import("pdf-lib")).StandardFonts.Helvetica);
     }
 
-    const pageSize = { width: 595.28, height: 841.89 }; // A4 in points
+    const pageSize = { width: 595.28, height: 841.89 }; // A4
     let page = pdfDoc.addPage([pageSize.width, pageSize.height]);
-    let { width, height } = page.getSize();
-
     const margin = 48;
     const fontSize = 11;
-    const lineHeight = fontSize * 1.35;
-    const maxWidth = width - margin * 2;
-
-    // Title
     const titleSize = 16;
+    const lineHeight = fontSize * 1.35;
+    const maxWidth = pageSize.width - margin * 2;
+
+    // Draw title
     page.drawText(title, {
       x: margin,
-      y: height - margin,
+      y: pageSize.height - margin,
       size: titleSize,
       font,
       color: rgb(0, 0, 0),
     });
 
-    let yPosition = height - margin - titleSize - 12;
+    let yPosition = pageSize.height - margin - titleSize - 12;
 
-    // Normalize contractText: ensure consistent newlines
+    // Normalize and split into logical lines
     const normalized = contractText.replace(/\r/g, "");
-    // We will process line-by-line but with wrapping
     const rawLines = normalized.split("\n");
 
     for (let i = 0; i < rawLines.length; i++) {
       let line = rawLines[i];
 
-      // Convert markdown headings to visible heading lines
-      let isHeading = false;
-      let headingSize = fontSize;
-      if (line.startsWith("# ")) {
-        line = line.replace(/^#\s*/, "").trim();
-        isHeading = true;
-        headingSize = 14;
-      } else if (line.startsWith("## ")) {
-        line = line.replace(/^##\s*/, "").trim();
-        isHeading = true;
-        headingSize = 12.5;
-      } else if (line.startsWith("### ")) {
-        line = line.replace(/^###\s*/, "").trim();
-        isHeading = true;
-        headingSize = 11.5;
+      // Recognize headings (markdown) and adjust size
+      let heading = false;
+      let drawSize = fontSize;
+      if (/^#\s+/.test(line)) {
+        line = line.replace(/^#\s+/, "").trim();
+        heading = true;
+        drawSize = 14;
+      } else if (/^##\s+/.test(line)) {
+        line = line.replace(/^##\s+/, "").trim();
+        heading = true;
+        drawSize = 12.5;
+      } else if (/^###\s+/.test(line)) {
+        line = line.replace(/^###\s+/, "").trim();
+        heading = true;
+        drawSize = 11.5;
       }
 
-      // If empty line -> add spacing
       if (!line.trim()) {
         yPosition -= lineHeight / 2;
-      } else {
-        // Wrap the line according to available width
-        const linesToDraw = wrapTextToLines(line, font, isHeading ? headingSize : fontSize, maxWidth);
+        continue;
+      }
 
-        for (const outLine of linesToDraw) {
-          // if not enough space on the page, create a new one and switch page reference
-          if (yPosition - lineHeight < margin) {
-            page = pdfDoc.addPage([pageSize.width, pageSize.height]);
-            width = page.getSize().width;
-            height = page.getSize().height;
-            yPosition = height - margin;
-          }
+      const linesToDraw = wrapTextToLines(line, font, drawSize, maxWidth);
 
-          page.drawText(outLine, {
-            x: margin,
-            y: yPosition,
-            size: isHeading ? headingSize : fontSize,
-            font,
-            color: rgb(0, 0, 0),
-          });
-
-          yPosition -= lineHeight;
+      for (const outLine of linesToDraw) {
+        if (yPosition - lineHeight < margin) {
+          page = pdfDoc.addPage([pageSize.width, pageSize.height]);
+          yPosition = page.getSize().height - margin;
         }
+
+        page.drawText(outLine, {
+          x: margin,
+          y: yPosition,
+          size: drawSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
+
+        yPosition -= lineHeight;
       }
     }
 
@@ -174,5 +157,6 @@ export function downloadPDF(pdfBytes: Uint8Array, filename = "sozlesme.pdf") {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  // revoke after a small timeout to ensure download starts
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

@@ -11,6 +11,7 @@
   "dependencies": {
     "@google/generative-ai": "latest",
     "@hookform/resolvers": "^3.10.0",
+    "@pdf-lib/fontkit": "latest",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",
