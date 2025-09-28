@@ -1,9 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState } from "react"
-import { Algodv2 } from "algosdk"
-import LuteConnect from "lute-connect"
+import { createContext, useContext, useState, useEffect } from "react"
 
 interface WalletState {
   isConnected: boolean
@@ -21,9 +19,6 @@ interface WalletContextType {
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
 
-const algodClient = new Algodv2("", "https://testnet-api.algonode.cloud", "")
-const lute = new LuteConnect()
-
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [wallet, setWallet] = useState<WalletState>({
     isConnected: false,
@@ -32,7 +27,36 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     balance: 0,
   })
 
+  const [algodClient, setAlgodClient] = useState<any>(null)
+  const [lute, setLute] = useState<any>(null)
+
+  useEffect(() => {
+    // Only initialize on client-side
+    if (typeof window !== "undefined") {
+      const initializeClients = async () => {
+        try {
+          const { Algodv2 } = await import("algosdk")
+          const LuteConnect = (await import("lute-connect")).default
+
+          const client = new Algodv2("", "https://testnet-api.algonode.cloud", "")
+          const luteInstance = new LuteConnect()
+
+          setAlgodClient(client)
+          setLute(luteInstance)
+        } catch (error) {
+          console.error("[v0] Failed to initialize wallet clients:", error)
+        }
+      }
+
+      initializeClients()
+    }
+  }, [])
+
   const connectWallet = async () => {
+    if (!algodClient || !lute) {
+      throw new Error("Wallet clients not initialized")
+    }
+
     try {
       console.log("[v0] Starting Lute wallet connection...")
 
@@ -86,8 +110,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signTransaction = async (txData: any): Promise<string> => {
-    if (!wallet.isConnected || !wallet.address) {
-      throw new Error("Wallet not connected")
+    if (!wallet.isConnected || !wallet.address || !algodClient || !lute) {
+      throw new Error("Wallet not connected or clients not initialized")
     }
 
     try {
