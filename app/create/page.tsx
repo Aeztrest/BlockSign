@@ -1,3 +1,4 @@
+```tsx
 "use client"
 
 import { useState } from "react"
@@ -17,14 +18,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bot, FileText, Loader2, CheckCircle, AlertTriangle, Upload, Zap, Plus, X, Send } from "lucide-react"
+import { Bot, FileText, Loader2, CheckCircle, AlertTriangle, Zap, Plus, X, Send, Server } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { WalletGuard } from "@/components/wallet-guard"
 import { useWallet } from "@/lib/wallet-context"
 import { generateContract } from "@/lib/gemini"
 import { exportToPDF, downloadPDF } from "@/lib/pdf-utils"
-import { uploadToIPFS } from "@/lib/ipfs-utils"
+// IPFS kaldırıldı
+// import { uploadToIPFS } from "@/lib/ipfs-utils"
 import { writeToAlgorand } from "@/lib/algorand-utils"
+
+const BACKEND_BASE = "https://algoback.hackstack.com.tr"
 
 export default function CreateContractPage() {
   const { toast } = useToast()
@@ -39,7 +43,8 @@ export default function CreateContractPage() {
   const [inviteMessage, setInviteMessage] = useState("")
 
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null)
-  const [ipfsCid, setIpfsCid] = useState<string>("")
+  const [serverFileUrl, setServerFileUrl] = useState<string>("")
+  const [serverFileSha256, setServerFileSha256] = useState<string>("")
   const [algorandTxId, setAlgorandTxId] = useState<string>("")
   const [stepStatuses, setStepStatuses] = useState<Record<number, "pending" | "in-progress" | "completed" | "error">>({
     0: "pending",
@@ -48,7 +53,6 @@ export default function CreateContractPage() {
     3: "pending",
   })
 
-  // Structured fields
   const [parties, setParties] = useState([{ name: "", address: "" }])
   const [country, setCountry] = useState("")
   const [currency, setCurrency] = useState("TL")
@@ -58,9 +62,53 @@ export default function CreateContractPage() {
   const steps = [
     { title: "Taslak", description: "AI ile oluştur", icon: Bot },
     { title: "PDF", description: "Dışa aktar", icon: FileText },
-    { title: "IPFS", description: "Yükle", icon: Upload },
+    { title: "Sunucu", description: "Yükle", icon: Server },
     { title: "Algorand", description: "Zincire yaz", icon: Zap },
   ]
+
+  async function uploadPdfToBackend(pdf: Uint8Array, filename: string) {
+    // Browser'da multipart/form-data için File/Blob oluştur
+    const file = new File([pdf], filename, { type: "application/pdf" })
+    const form = new FormData()
+    form.append("file", file)
+
+    const resp = await fetch(`${BACKEND_BASE}/upload`, {
+      method: "POST",
+      body: form,
+      headers: {
+        // FormData ile Content-Type otomatik belirlenir; elle vermeyin
+        accept: "application/json",
+      },
+    })
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "")
+      throw new Error(`Upload başarısız (HTTP ${resp.status}) ${text}`)
+    }
+
+    const data = await resp.json()
+    // Beklenen örnek:
+    // {
+    //   ok: true,
+    //   public_url: "/files/xxx.pdf",
+    //   sha256: "...", ...
+    // }
+
+    if (!data?.ok || !data?.public_url) {
+      throw new Error("Beklenmeyen upload cevabı alındı")
+    }
+
+    const absoluteUrl =
+      typeof data.public_url === "string" && data.public_url.startsWith("http")
+        ? data.public_url
+        : `${BACKEND_BASE}${data.public_url}`
+
+    return {
+      absoluteUrl,
+      sha256: data.sha256 as string | undefined,
+      raw: data,
+    }
+  }
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -110,7 +158,8 @@ export default function CreateContractPage() {
       setStepStatuses((prev) => ({ ...prev, [step]: "in-progress" }))
 
       switch (step) {
-        case 1: // Export to PDF
+        case 1: {
+          // Export to PDF
           if (!generatedContract) {
             throw new Error("Önce sözleşme oluşturmalısınız")
           }
@@ -132,32 +181,37 @@ export default function CreateContractPage() {
             description: "Sözleşme PDF olarak hazırlandı ve indirildi",
           })
           break
+        }
 
-        case 2: // Upload to IPFS
+        case 2: {
+          // Upload to Server (IPFS yerine backend)
           if (!pdfBytes) {
             throw new Error("Önce PDF oluşturmalısınız")
           }
 
           toast({
-            title: "IPFS'e Yükleniyor",
-            description: "Sözleşme IPFS ağına yükleniyor...",
+            title: "Sunucuya Yükleniyor",
+            description: "Sözleşme sunucuya yükleniyor...",
           })
 
-          const cid = await uploadToIPFS(pdfBytes, `contract-${Date.now()}.pdf`)
-          setIpfsCid(cid)
+          const { absoluteUrl, sha256 } = await uploadPdfToBackend(pdfBytes, `contract-${Date.now()}.pdf`)
+          setServerFileUrl(absoluteUrl)
+          if (sha256) setServerFileSha256(sha256)
 
           setStepStatuses((prev) => ({ ...prev, [step]: "completed" }))
           setCurrentStep(2)
 
           toast({
-            title: "IPFS'e Yüklendi",
-            description: `CID: ${cid}`,
+            title: "Sunucuya Yüklendi",
+            description: `Dosya URL: ${absoluteUrl}`,
           })
           break
+        }
 
-        case 3: // Create On-chain Record
-          if (!ipfsCid) {
-            throw new Error("Önce IPFS'e yükleme yapmalısınız")
+        case 3: {
+          // Create On-chain Record
+          if (!serverFileUrl) {
+            throw new Error("Önce sunucuya yükleme yapmalısınız")
           }
 
           if (!wallet?.address) {
@@ -169,7 +223,7 @@ export default function CreateContractPage() {
             description: "Algorand ağında kayıt oluşturuluyor...",
           })
 
-          const txId = await writeToAlgorand(ipfsCid, wallet.address, wallet.signTransaction)
+          const txId = await writeToAlgorand(serverFileUrl, wallet.address, wallet.signTransaction)
           setAlgorandTxId(txId)
 
           setStepStatuses((prev) => ({ ...prev, [step]: "completed" }))
@@ -181,6 +235,7 @@ export default function CreateContractPage() {
           })
           setInviteDialogOpen(true)
           break
+        }
       }
     } catch (error) {
       setStepStatuses((prev) => ({ ...prev, [step]: "error" }))
@@ -458,17 +513,22 @@ export default function CreateContractPage() {
                     <div className="space-y-4">
                       {steps.map((step, index) => (
                         <div key={index} className="flex items-center gap-4">
-                          <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center ${getStepColor(index)}`}
-                          >
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getStepColor(index)}`}>
                             {getStepIcon(index)}
                           </div>
                           <div className="flex-1">
                             <h4 className="font-medium">{step.title}</h4>
                             <p className="text-sm text-muted-foreground">{step.description}</p>
-                            {index === 2 && ipfsCid && <p className="text-xs text-emerald-600 mt-1">CID: {ipfsCid}</p>}
+                            {index === 2 && serverFileUrl && (
+                              <>
+                                <p className="text-xs text-emerald-600 mt-1 break-all">URL: {serverFileUrl}</p>
+                                {serverFileSha256 && (
+                                  <p className="text-xs text-muted-foreground">SHA-256: {serverFileSha256}</p>
+                                )}
+                              </>
+                            )}
                             {index === 3 && algorandTxId && (
-                              <p className="text-xs text-emerald-600 mt-1">TxID: {algorandTxId}</p>
+                              <p className="text-xs text-emerald-600 mt-1 break-all">TxID: {algorandTxId}</p>
                             )}
                           </div>
                           {stepStatuses[index] === "pending" && index > 0 && (
@@ -553,3 +613,4 @@ export default function CreateContractPage() {
     </WalletGuard>
   )
 }
+```

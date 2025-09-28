@@ -65,7 +65,7 @@ export function Header() {
                 <Zap className="h-5 w-5 text-white" />
               </div>
               <div className="hidden sm:flex flex-col">
-                <span className="font-bold text-lg">SignChain</span>
+                <span className="font-bold text-lg">BlockSign</span>
                 <span className="text-xs text-muted-foreground">Algorand-powered e-sign</span>
               </div>
             </Link>
@@ -170,7 +170,7 @@ export function Header() {
                       <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-emerald-500">
                         <Zap className="h-4 w-4 text-white" />
                       </div>
-                      SignChain
+                      BlockSign
                     </SheetTitle>
                   </SheetHeader>
                   <div className="mt-6 space-y-4">
