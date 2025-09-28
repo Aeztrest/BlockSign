@@ -64,7 +64,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const genesisInfo = await algodClient.genesis().do()
       const genesisID = `${genesisInfo.network}-${genesisInfo.id}`  // "testnet-v1.0"
 
-      console.log("[v0] Genesis ID:", genesisID)
+      console.log("[Aez'] Genesis ID:", genesisID)
 
       // Connect to Lute wallet with genesis ID
       const accounts = await lute.connect(genesisID)
