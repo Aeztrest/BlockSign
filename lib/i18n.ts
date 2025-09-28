@@ -5,7 +5,6 @@ export const translations = {
     dashboard: "Panel",
     create: "Oluştur",
     settings: "Ayarlar",
-    profile: "Profil",
 
     // Wallet
     connectWallet: "Cüzdan Bağla",
@@ -238,26 +237,6 @@ export const translations = {
     exodusWallet: "Exodus Wallet",
     exodusWalletDesc: "Çok para birimli masaüstü cüzdanı",
 
-    // Profile Page Specific Translations
-    profileTitle: "Kullanıcı Profili",
-    profileSubtitle: "Hesap bilgilerinizi ve tercihlerinizi yönetin",
-    personalInfo: "Kişisel Bilgiler",
-    personalInfoDesc: "Temel profil bilgilerinizi güncelleyin",
-    accountInfo: "Hesap Bilgileri",
-    accountInfoDesc: "Hesap durumunuz ve istatistikleriniz",
-    memberSince: "Üyelik Tarihi",
-    totalContracts: "Toplam Sözleşme",
-    contractsSigned: "İmzalanan Sözleşme",
-    contractsCreated: "Oluşturulan Sözleşme",
-    phone: "Telefon",
-    phonePlaceholder: "Telefon numaranızı girin",
-    location: "Konum",
-    locationPlaceholder: "Şehir, Ülke",
-    bio: "Hakkında",
-    bioPlaceholder: "Kendiniz hakkında kısa bir açıklama yazın",
-    profileUpdated: "Profil Güncellendi",
-    profileUpdatedDesc: "Profil bilgileriniz başarıyla güncellendi",
-
     // Common
     cancel: "İptal",
     close: "Kapat",
@@ -280,7 +259,6 @@ export const translations = {
     dashboard: "Dashboard",
     create: "Create",
     settings: "Settings",
-    profile: "Profile",
 
     // Wallet
     connectWallet: "Connect Wallet",
@@ -512,26 +490,6 @@ export const translations = {
     deflyWalletDesc: "Advanced DeFi features",
     exodusWallet: "Exodus Wallet",
     exodusWalletDesc: "Multi-currency desktop wallet",
-
-    // Profile Page Specific Translations
-    profileTitle: "User Profile",
-    profileSubtitle: "Manage your account information and preferences",
-    personalInfo: "Personal Information",
-    personalInfoDesc: "Update your basic profile information",
-    accountInfo: "Account Information",
-    accountInfoDesc: "Your account status and statistics",
-    memberSince: "Member Since",
-    totalContracts: "Total Contracts",
-    contractsSigned: "Contracts Signed",
-    contractsCreated: "Contracts Created",
-    phone: "Phone",
-    phonePlaceholder: "Enter your phone number",
-    location: "Location",
-    locationPlaceholder: "City, Country",
-    bio: "About",
-    bioPlaceholder: "Write a short description about yourself",
-    profileUpdated: "Profile Updated",
-    profileUpdatedDesc: "Your profile information has been updated successfully",
 
     // Common
     cancel: "Cancel",
