@@ -226,7 +226,7 @@ export default function CreateContractPage() {
       case "Medium":
         return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Orta</Badge>
       case "Low":
-        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Düşük</Badge>
+        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Mini</Badge>
       default:
         return <Badge variant="outline">{level}</Badge>
     }

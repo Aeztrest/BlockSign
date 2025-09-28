@@ -142,13 +142,13 @@ function parseContractFromPlainText(text: string): GeneratedContract {
   if (riskMatch && riskMatch[2]) {
     const lines = riskMatch[2].split(/\n/).map((l) => l.trim()).filter(Boolean)
     for (const l of lines) {
-      const m = l.match(/(High|Medium|Low|Yüksek|Orta|Düşük)\s*[:\-–]\s*(.+)/i)
+      const m = l.match(/(High|Medium|Low|Yüksek|Orta|Mini)\s*[:\-–]\s*(.+)/i)
       if (m) {
         let level = m[1]
         const desc = m[2]
         if (/yüksek/i.test(level)) level = "High"
         if (/orta/i.test(level)) level = "Medium"
-        if (/düşük/i.test(level)) level = "Low"
+        if (/mini/i.test(level)) level = "Low"
         riskAnalysis.push({ level, description: desc })
       } else {
         riskAnalysis.push({ level: "Medium", description: l })
