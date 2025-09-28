@@ -1,30 +1,117 @@
-# AI contract signing
+🚀 Project Name
+Innovative AI + Blockchain Consumer Application on Algorand
+📖 Overview
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+This project was built for the Algorand Hackathon. It combines Artificial Intelligence with Algorand’s Pure Proof-of-Stake blockchain to deliver a scalable, secure, and eco-friendly decentralized application.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/goktugtunc-2212s-projects/v0-ai-contract-signing)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/YAYHhjvyRZZ)
+Our solution leverages Algorand’s fast finality, low transaction costs, and developer-friendly ecosystem to bring real-world value in a consumer-focused application.
 
-## Overview
+✨ Features
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+🔗 Algorand Blockchain Integration
 
-## Deployment
+Smart contracts (ARC4 standard) for secure and transparent logic.
 
-Your project is live at:
+On-chain asset/token management (ASA).
 
-**[https://vercel.com/goktugtunc-2212s-projects/v0-ai-contract-signing](https://vercel.com/goktugtunc-2212s-projects/v0-ai-contract-signing)**
+🤖 AI-powered Capabilities
 
-## Build your app
+Automated decision-making and smart workflows.
 
-Continue building your app on:
+Seamless user experience where blockchain complexity is hidden.
 
-**[https://v0.app/chat/projects/YAYHhjvyRZZ](https://v0.app/chat/projects/YAYHhjvyRZZ)**
+🌐 Web3-Ready Frontend
 
-## How It Works
+Modern UI with wallet integration (Pera, Defly, Exodus).
 
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+Real-time interactions with Algorand Testnet/Mainnet.
+
+💸 Low-Cost Transactions
+
+Uses Algorand’s fixed fee of 0.001 ALGO for microtransactions.
+
+🛠 Tech Stack
+
+Frontend: Next.js + React + TailwindCSS
+
+Backend: Node.js + API integration
+
+Blockchain: Algorand (Testnet & Mainnet)
+
+Smart Contracts: Algorand Python / TypeScript (ARC4)
+
+Wallets: Pera Wallet, Defly Wallet (via use-wallet)
+
+Storage: IPFS / Pinata for decentralized file handling
+
+📂 Project Architecture
+/app
+  ├── frontend/         # Next.js + Tailwind dApp
+  ├── contracts/        # Algorand smart contracts (Python / TypeScript)
+  ├── backend/          # API services and AI integrations
+  └── docs/             # Documentation & guides
+
+⚡️ Installation & Setup
+1. Clone Repository
+git clone https://github.com/<your-repo>.git
+cd <your-repo>
+
+2. Install Dependencies
+npm install
+
+3. Configure Environment
+
+Create a .env.local file:
+
+NEXT_PUBLIC_ALGOD_URL=https://testnet-api.algonode.cloud
+NEXT_PUBLIC_ALGOD_API_KEY=...
+NEXT_PUBLIC_IPFS_TOKEN=...
+PINATA_JWT=...
+
+4. Run Local Development
+npm run dev
+
+🔐 Smart Contracts
+
+Written in Algorand Python / TypeScript using AlgoKit.
+
+Implements ARC4 ABI methods for safe and standardized interaction.
+
+Example contract:
+
+class Counter(algopy.ARC4Contract):
+    def __init__(self) -> None:
+        self.counter = algopy.UInt64(0)
+
+    @algopy.arc4.abimethod(create="allow")
+    def increment(self) -> algopy.arc4.UInt64:
+        self.counter += 1
+        return algopy.arc4.UInt64(self.counter)
+
+📱 Wallet Integration
+
+Pera Wallet setup with Testnet.
+
+Users can connect, sign, and broadcast transactions seamlessly.
+
+Supports switching between Localnet, Testnet, and Mainnet.
+
+👥 Team
+
+Team Name: HackStack
+
+Members:
+
+[Your Name] – [Email]
+
+[Teammate] – [Email]
+
+🏆 Hackathon Criteria
+
+✅ Original & innovative solution
+
+✅ Comprehensive Algorand blockchain integration
+
+✅ AI-enhanced features for real-world impact
+
+✅ Ready-to-use MVP with intuitive UX
