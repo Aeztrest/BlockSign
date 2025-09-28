@@ -68,7 +68,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       console.warn("[v0] algod.genesis() failed:", e)
       genesisInfo = null
     }
-    console.log("[v0] full genesisInfo:", genesisInfo)
 
     // 2) Try multiple common fields to build genesisID
     let genesisID: string | undefined
@@ -102,7 +101,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       let balance = 0
       try {
         const accountInfo = await algodClient.accountInformation(userAddress).do()
-        balance = (accountInfo?.amount ?? 0) / 1_000_000
+        const rawAmount = accountInfo?.amount ?? 0
+        // handle BigInt or number
+        const microAlgos = typeof rawAmount === "bigint" ? Number(rawAmount) : Number(rawAmount)
+        balance = microAlgos / 1_000_000
       } catch (e) {
         console.warn("[v0] Could not fetch balance:", e)
       }
