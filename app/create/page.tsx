@@ -21,11 +21,10 @@ import { Bot, FileText, Loader2, CheckCircle, AlertTriangle, Upload, Zap, Plus, 
 import { useToast } from "@/hooks/use-toast"
 import { WalletGuard } from "@/components/wallet-guard"
 import { useWallet } from "@/lib/wallet-context"
-import { generateContractAction } from "@/lib/actions/contract-actions"
-import { uploadToIPFSAction } from "@/lib/actions/ipfs-actions"
-import { writeToAlgorandAction, getAlgodClientParams } from "@/lib/actions/algorand-actions"
+import { generateContract } from "@/lib/gemini"
 import { exportToPDF, downloadPDF } from "@/lib/pdf-utils"
-import { createAlgorandTransaction } from "@/lib/algorand-utils"
+import { uploadToIPFS } from "@/lib/ipfs-utils"
+import { writeToAlgorand } from "@/lib/algorand-utils"
 
 export default function CreateContractPage() {
   const { toast } = useToast()
@@ -77,7 +76,7 @@ export default function CreateContractPage() {
     setStepStatuses((prev) => ({ ...prev, 0: "in-progress" }))
 
     try {
-      const contract = await generateContractAction({
+      const contract = await generateContract({
         prompt,
         parties,
         country,
@@ -144,7 +143,7 @@ export default function CreateContractPage() {
             description: "Sözleşme IPFS ağına yükleniyor...",
           })
 
-          const cid = await uploadToIPFSAction(pdfBytes, `contract-${Date.now()}.pdf`)
+          const cid = await uploadToIPFS(pdfBytes, `contract-${Date.now()}.pdf`)
           setIpfsCid(cid)
 
           setStepStatuses((prev) => ({ ...prev, [step]: "completed" }))
@@ -170,15 +169,7 @@ export default function CreateContractPage() {
             description: "Algorand ağında kayıt oluşturuluyor...",
           })
 
-          const algodParams = await getAlgodClientParams()
-          const txnData = await createAlgorandTransaction(ipfsCid, wallet.address, algodParams)
-
-          // Sign transaction using wallet
-          const signedTxns = await wallet.signTransaction([txnData])
-          const signedTxnBase64 = Buffer.from(signedTxns[0]).toString("base64")
-
-          // Send signed transaction via server action
-          const txId = await writeToAlgorandAction(ipfsCid, wallet.address, signedTxnBase64)
+          const txId = await writeToAlgorand(ipfsCid, wallet.address, wallet.signTransaction)
           setAlgorandTxId(txId)
 
           setStepStatuses((prev) => ({ ...prev, [step]: "completed" }))
@@ -523,7 +514,7 @@ export default function CreateContractPage() {
                 <div className="flex gap-2 mt-2">
                   <Input placeholder="ALGO..." value={newSigner} onChange={(e) => setNewSigner(e.target.value)} />
                   <Button size="sm" onClick={addSigner}>
-                    <Plus className="mr-2 h-4 w-4" />
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </div>
                 {signers.length > 0 && (
