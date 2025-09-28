@@ -1,107 +1,178 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
+// lib/pdf.ts  (veya exportToPDF.ts)
+import { PDFDocument, rgb } from "pdf-lib";
+
+async function loadEmbeddedFont(pdfDoc: PDFDocument) {
+  // Try to load a unicode TTF from public folder
+  try {
+    const fontUrl = "/fonts/NotoSans-Regular.ttf";
+    const resp = await fetch(fontUrl);
+    if (!resp.ok) throw new Error("Font fetch failed: " + resp.status);
+    const fontBytes = await resp.arrayBuffer();
+    return await pdfDoc.embedFont(fontBytes);
+  } catch (err) {
+    console.warn("[exportToPDF] Unicode font load failed, falling back to StandardFonts (may break local chars):", err);
+    // fallback to a standard font (may not support Turkish chars)
+    return await pdfDoc.embedFont(PDFDocument.PDF_NAME ? (undefined as any) : (undefined as any)); // placeholder - we'll embed later
+  }
+}
+
+// Word wrap util: returns array of lines that fit maxWidth.
+// If a single word is longer than maxWidth, it breaks it by character.
+function wrapTextToLines(text: string, font: any, fontSize: number, maxWidth: number): string[] {
+  const paragraphs = text.replace(/\r/g, "").split("\n");
+  const outLines: string[] = [];
+
+  for (const para of paragraphs) {
+    if (!para.trim()) {
+      outLines.push("");
+      continue;
+    }
+    const words = para.split(" ");
+    let line = "";
+    for (const w of words) {
+      const candidate = line ? line + " " + w : w;
+      const width = font.widthOfTextAtSize(candidate, fontSize);
+      if (width <= maxWidth) {
+        line = candidate;
+      } else {
+        if (line) outLines.push(line);
+        // If single word itself is too long, split it by characters
+        if (font.widthOfTextAtSize(w, fontSize) > maxWidth) {
+          let chunk = "";
+          for (const ch of w) {
+            const test = chunk + ch;
+            if (font.widthOfTextAtSize(test, fontSize) > maxWidth) {
+              if (chunk) outLines.push(chunk);
+              chunk = ch;
+            } else {
+              chunk = test;
+            }
+          }
+          if (chunk) {
+            line = chunk; // continue with rest words
+          } else {
+            line = "";
+          }
+        } else {
+          line = w;
+        }
+      }
+    }
+    if (line) outLines.push(line);
+  }
+
+  return outLines;
+}
 
 export async function exportToPDF(contractText: string, title = "Sözleşme"): Promise<Uint8Array> {
   try {
-    const pdfDoc = await PDFDocument.create()
-    const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman)
-    const timesRomanBoldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold)
+    const pdfDoc = await PDFDocument.create();
 
-    const page = pdfDoc.addPage()
-    const { width, height } = page.getSize()
-    const fontSize = 12
-    const margin = 50
-    const lineHeight = fontSize * 1.2
+    // Try to embed Unicode font from public/fonts
+    let font: any = null;
+    try {
+      const fontUrl = "/fonts/NotoSans-Regular.ttf";
+      const fResp = await fetch(fontUrl);
+      if (!fResp.ok) throw new Error("Font not found at " + fontUrl);
+      const fontBytes = await fResp.arrayBuffer();
+      font = await pdfDoc.embedFont(fontBytes);
+    } catch (e) {
+      console.warn("[exportToPDF] Unicode font embed failed, will try StandardFonts (non-Unicode)", e);
+      // fallback to a standard font (may fail on Turkish chars)
+      font = await pdfDoc.embedFont((await import("pdf-lib")).StandardFonts.Helvetica);
+    }
+
+    const pageSize = { width: 595.28, height: 841.89 }; // A4 in points
+    let page = pdfDoc.addPage([pageSize.width, pageSize.height]);
+    let { width, height } = page.getSize();
+
+    const margin = 48;
+    const fontSize = 11;
+    const lineHeight = fontSize * 1.35;
+    const maxWidth = width - margin * 2;
 
     // Title
+    const titleSize = 16;
     page.drawText(title, {
       x: margin,
       y: height - margin,
-      size: 18,
-      font: timesRomanBoldFont,
+      size: titleSize,
+      font,
       color: rgb(0, 0, 0),
-    })
+    });
 
-    // Content
-    const lines = contractText.split("\n")
-    let yPosition = height - margin - 40
+    let yPosition = height - margin - titleSize - 12;
 
-    for (const line of lines) {
-      if (yPosition < margin) {
-        // Add new page if needed
-        const newPage = pdfDoc.addPage()
-        yPosition = newPage.getSize().height - margin
+    // Normalize contractText: ensure consistent newlines
+    const normalized = contractText.replace(/\r/g, "");
+    // We will process line-by-line but with wrapping
+    const rawLines = normalized.split("\n");
+
+    for (let i = 0; i < rawLines.length; i++) {
+      let line = rawLines[i];
+
+      // Convert markdown headings to visible heading lines
+      let isHeading = false;
+      let headingSize = fontSize;
+      if (line.startsWith("# ")) {
+        line = line.replace(/^#\s*/, "").trim();
+        isHeading = true;
+        headingSize = 14;
+      } else if (line.startsWith("## ")) {
+        line = line.replace(/^##\s*/, "").trim();
+        isHeading = true;
+        headingSize = 12.5;
+      } else if (line.startsWith("### ")) {
+        line = line.replace(/^###\s*/, "").trim();
+        isHeading = true;
+        headingSize = 11.5;
       }
 
-      // Handle markdown headers
-      if (line.startsWith("# ")) {
-        page.drawText(line.substring(2), {
-          x: margin,
-          y: yPosition,
-          size: 16,
-          font: timesRomanBoldFont,
-          color: rgb(0, 0, 0),
-        })
-      } else if (line.startsWith("## ")) {
-        page.drawText(line.substring(3), {
-          x: margin,
-          y: yPosition,
-          size: 14,
-          font: timesRomanBoldFont,
-          color: rgb(0, 0, 0),
-        })
+      // If empty line -> add spacing
+      if (!line.trim()) {
+        yPosition -= lineHeight / 2;
       } else {
-        // Regular text with word wrapping
-        const words = line.split(" ")
-        let currentLine = ""
+        // Wrap the line according to available width
+        const linesToDraw = wrapTextToLines(line, font, isHeading ? headingSize : fontSize, maxWidth);
 
-        for (const word of words) {
-          const testLine = currentLine + (currentLine ? " " : "") + word
-          const textWidth = timesRomanFont.widthOfTextAtSize(testLine, fontSize)
-
-          if (textWidth > width - 2 * margin && currentLine) {
-            page.drawText(currentLine, {
-              x: margin,
-              y: yPosition,
-              size: fontSize,
-              font: timesRomanFont,
-              color: rgb(0, 0, 0),
-            })
-            yPosition -= lineHeight
-            currentLine = word
-          } else {
-            currentLine = testLine
+        for (const outLine of linesToDraw) {
+          // if not enough space on the page, create a new one and switch page reference
+          if (yPosition - lineHeight < margin) {
+            page = pdfDoc.addPage([pageSize.width, pageSize.height]);
+            width = page.getSize().width;
+            height = page.getSize().height;
+            yPosition = height - margin;
           }
-        }
 
-        if (currentLine) {
-          page.drawText(currentLine, {
+          page.drawText(outLine, {
             x: margin,
             y: yPosition,
-            size: fontSize,
-            font: timesRomanFont,
+            size: isHeading ? headingSize : fontSize,
+            font,
             color: rgb(0, 0, 0),
-          })
+          });
+
+          yPosition -= lineHeight;
         }
       }
-
-      yPosition -= lineHeight
     }
 
-    return await pdfDoc.save()
+    const bytes = await pdfDoc.save();
+    return bytes;
   } catch (error) {
-    console.error("PDF generation error:", error)
-    throw new Error("PDF oluşturulurken hata oluştu")
+    console.error("PDF generation error:", error);
+    throw new Error("PDF oluşturulurken hata oluştu: " + String(error));
   }
 }
 
 export function downloadPDF(pdfBytes: Uint8Array, filename = "sozlesme.pdf") {
-  const blob = new Blob([pdfBytes], { type: "application/pdf" })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement("a")
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  const blob = new Blob([pdfBytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
