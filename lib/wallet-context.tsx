@@ -53,52 +53,78 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const connectWallet = async () => {
-    if (!algodClient || !lute) {
-      throw new Error("Wallet clients not initialized")
-    }
-
-    try {
-      console.log("[v0] Starting Lute wallet connection...")
-
-      // Get genesis ID from Algod client
-      const genesisInfo = await algodClient.genesis().do()
-      console.log("[v0] full genesisInfo:", genesisInfo)
-      const genesisID = `${genesisInfo.network}-${genesisInfo.id}`  // "testnet-v1.0"
-
-      console.log("[Aez'] Genesis ID:", genesisID)
-
-      // Connect to Lute wallet with genesis ID
-      const accounts = await lute.connect(genesisID)
-
-      if (accounts && accounts.length > 0) {
-        const userAddress = accounts[0]
-        console.log("[v0] Connected to address:", userAddress)
-
-        // Get account balance
-        let balance = 0
-        try {
-          const accountInfo = await algodClient.accountInformation(userAddress).do()
-          balance = accountInfo.amount / 1000000 // Convert microAlgos to Algos
-        } catch (error) {
-          console.log("[v0] Could not fetch balance:", error)
-        }
-
-        setWallet({
-          isConnected: true,
-          address: userAddress,
-          walletType: "lute",
-          balance,
-        })
-
-        console.log("[v0] Wallet connected successfully")
-      } else {
-        throw new Error("No accounts returned from Lute")
-      }
-    } catch (error) {
-      console.error("[v0] Wallet connection error:", error)
-      throw error
-    }
+  if (!algodClient || !lute) {
+    throw new Error("Wallet clients not initialized")
   }
+
+  try {
+    console.log("[v0] Starting Lute wallet connection...")
+
+    // 1) Get full genesis object (and log it once for debugging)
+    let genesisInfo: any
+    try {
+      genesisInfo = await algodClient.genesis().do()
+    } catch (e) {
+      console.warn("[v0] algod.genesis() failed:", e)
+      genesisInfo = null
+    }
+    console.log("[v0] full genesisInfo:", genesisInfo)
+
+    // 2) Try multiple common fields to build genesisID
+    let genesisID: string | undefined
+
+    if (genesisInfo) {
+      // common variants
+      genesisID =
+        (genesisInfo.network && genesisInfo.id && `${genesisInfo.network}-${genesisInfo.id}`) || // old approach
+        genesisInfo.genesisID || // some providers use 'genesisID'
+        genesisInfo.genesis_id || // snake_case variant
+        genesisInfo.genesisId || // camelCase
+        genesisInfo["genesis-id"] // other variants
+    }
+
+    // 3) fallback to known TestNet id if nothing found
+    if (!genesisID) {
+      console.warn("[v0] Could not derive genesisID from response, using fallback 'testnet-v1.0'")
+      genesisID = "testnet-v1.0"
+    }
+
+    console.log("[v0] Using Genesis ID:", genesisID)
+
+    // 4) IMPORTANT: ensure this call is from a user gesture (button click)
+    const accounts = await lute.connect(genesisID)
+
+    if (accounts && accounts.length > 0) {
+      const userAddress = accounts[0]
+      console.log("[v0] Connected to address:", userAddress)
+
+      // fetch balance (safe)
+      let balance = 0
+      try {
+        const accountInfo = await algodClient.accountInformation(userAddress).do()
+        balance = (accountInfo?.amount ?? 0) / 1_000_000
+      } catch (e) {
+        console.warn("[v0] Could not fetch balance:", e)
+      }
+
+      setWallet({
+        isConnected: true,
+        address: userAddress,
+        walletType: "lute",
+        balance,
+      })
+
+      console.log("[v0] Wallet connected successfully")
+    } else {
+      throw new Error("No accounts returned from Lute")
+    }
+  } catch (error) {
+    console.error("[v0] Wallet connection error:", error)
+    // UI toast gösteriyorsan burada göster
+    throw error
+  }
+}
+
 
   const disconnectWallet = () => {
     console.log("[v0] Disconnecting wallet...")
