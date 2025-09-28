@@ -55,16 +55,18 @@ function detectLanguage(text?: string): "tr" | "en" {
 /** helper: try to unescape common JSON-escaped sequences so text becomes readable */
 function unescapeText(s: string) {
   if (!s) return s
-  return s
-    .replace(/\\r/g, "\r")
-    .replace(/\\n/g, "\n")
-    .replace(/\\t/g, "\t")
-    .replace(/\\"/g, '"')
-    .replace(/\\'/g, "'")
-    // decode simple \u00XX escapes
-    .replace(/\\u00([0-9A-Fa-f]{2})/g, (_m, p1) => String.fromCharCode(parseInt(p1, 16)))
-    // decode full \uXXXX escapes
-    .replace(/\\u([0-9A-Fa-f]{4})/g, (_m, p1) => String.fromCharCode(parseInt(p1, 16)))
+  return (
+    s
+      .replace(/\\r/g, "\r")
+      .replace(/\\n/g, "\n")
+      .replace(/\\t/g, "\t")
+      .replace(/\\"/g, '"')
+      .replace(/\\'/g, "'")
+      // decode simple \u00XX escapes
+      .replace(/\\u00([0-9A-Fa-f]{2})/g, (_m, p1) => String.fromCharCode(Number.parseInt(p1, 16)))
+      // decode full \uXXXX escapes
+      .replace(/\\u([0-9A-Fa-f]{4})/g, (_m, p1) => String.fromCharCode(Number.parseInt(p1, 16)))
+  )
 }
 
 /** extract first JSON-like substring (naive) */
@@ -114,9 +116,9 @@ function parseContractFromPlainText(text: string): GeneratedContract {
   let riskAnalysis: Array<{ level: string; description: string }> = []
 
   const summaryMatch =
-    text.match(/(?:^|\n)#{0,3}\s*ÖZET\s*[:\-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i) ||
-    text.match(/(?:^|\n)#{0,3}\s*Özet\s*[:\-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i) ||
-    text.match(/(?:^|\n)#{0,3}\s*SUMMARY\s*[:\-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i)
+    text.match(/(?:^|\n)#{0,3}\s*ÖZET\s*[:-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i) ||
+    text.match(/(?:^|\n)#{0,3}\s*Özet\s*[:-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i) ||
+    text.match(/(?:^|\n)#{0,3}\s*SUMMARY\s*[:-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i)
 
   if (summaryMatch) {
     const bullets = summaryMatch[1]
@@ -136,11 +138,15 @@ function parseContractFromPlainText(text: string): GeneratedContract {
 
   // risk extraction
   const riskMatch =
-    text.match(/(?:^|\n)#{0,3}\s*(Risk Analizi|RİSK|RISK|RİSK ANALİZİ|RISK ANALYSIS)\s*[:\-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i) ||
-    text.match(/(?:^|\n)(RİSK|RISK)[\s\S]{0,200}/i)
+    text.match(
+      /(?:^|\n)#{0,3}\s*(Risk Analizi|RİSK|RISK|RİSK ANALİZİ|RISK ANALYSIS)\s*[:-]?\s*([\s\S]*?)(?:\n#{1,3}\s|$)/i,
+    ) || text.match(/(?:^|\n)(RİSK|RISK)[\s\S]{0,200}/i)
 
   if (riskMatch && riskMatch[2]) {
-    const lines = riskMatch[2].split(/\n/).map((l) => l.trim()).filter(Boolean)
+    const lines = riskMatch[2]
+      .split(/\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
     for (const l of lines) {
       const m = l.match(/(High|Medium|Low|Yüksek|Orta|Mini)\s*[:\-–]\s*(.+)/i)
       if (m) {
@@ -157,7 +163,8 @@ function parseContractFromPlainText(text: string): GeneratedContract {
   }
 
   if (summary.length === 0) summary = ["Özet otomatik olarak üretilemedi."]
-  if (riskAnalysis.length === 0) riskAnalysis = [{ level: "Medium", description: "Risk analizi otomatik olarak üretilemedi." }]
+  if (riskAnalysis.length === 0)
+    riskAnalysis = [{ level: "Medium", description: "Risk analizi otomatik olarak üretilemedi." }]
 
   return { contract, summary, riskAnalysis }
 }
@@ -165,10 +172,22 @@ function parseContractFromPlainText(text: string): GeneratedContract {
 /** Normalize result object to GeneratedContract with safe defaults */
 function normalizeParsedJson(parsed: any): GeneratedContract {
   const contractRaw = parsed.contract ?? parsed.text ?? parsed.content ?? ""
-  const contract = typeof contractRaw === "string" ? unescapeText(contractRaw).replace(/^"(.*)"$/s, "$1").trim() : JSON.stringify(contractRaw)
-  const summaryArr = Array.isArray(parsed.summary) ? parsed.summary.map(String) : parsed.summary ? [String(parsed.summary)] : ["Özet bulunamadı"]
+  const contract =
+    typeof contractRaw === "string"
+      ? unescapeText(contractRaw)
+          .replace(/^"(.*)"$/s, "$1")
+          .trim()
+      : JSON.stringify(contractRaw)
+  const summaryArr = Array.isArray(parsed.summary)
+    ? parsed.summary.map(String)
+    : parsed.summary
+      ? [String(parsed.summary)]
+      : ["Özet bulunamadı"]
   const riskArr = Array.isArray(parsed.riskAnalysis)
-    ? parsed.riskAnalysis.map((r: any) => ({ level: String(r.level ?? "Medium"), description: String(r.description ?? r) }))
+    ? parsed.riskAnalysis.map((r: any) => ({
+        level: String(r.level ?? "Medium"),
+        description: String(r.description ?? r),
+      }))
     : [{ level: "Medium", description: "Risk analizi yok" }]
 
   return { contract, summary: summaryArr, riskAnalysis: riskArr }
@@ -176,14 +195,18 @@ function normalizeParsedJson(parsed: any): GeneratedContract {
 
 /** main function */
 export async function generateContract(params: ContractParams): Promise<GeneratedContract> {
-  // prefer server-side key variables
-  const apiKey = process.env.GENAI_API_KEY || process.env.GENERATIVE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
+  const apiKey = process.env.GENAI_API_KEY || process.env.GENERATIVE_API_KEY || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
 
   if (!apiKey) {
     // dev fallback
     return {
       contract: `# FREELANCE YAZILIM GELİŞTİRME SÖZLEŞMESİ\n\n## TARAFLAR\n${params.parties.map((p) => `**${p.name}:** ${p.address}`).join("\n")}\n\n## PROJE KAPSAMI\n${params.prompt}\n\n## ÖDEME KOŞULLARI\n- Para birimi: ${params.currency}\n- Ülke: ${params.country}\n\n## TESLİM TARİHİ\n${params.deadline ? `Proje ${formatDateTR(params.deadline)} tarihine kadar tamamlanacaktır.` : "Teslim tarihi belirtilmemiştir."}\n\n## FESİH KOŞULLARI\n${params.termination ? `Her iki taraf da ${params.termination} gün önceden yazılı bildirimde bulunarak sözleşmeyi feshedebilir.` : "Fesih koşulları belirtilmemiştir."}`,
-      summary: ["AI tarafından oluşturulan sözleşme", `Para birimi: ${params.currency}`, `Ülke: ${params.country}`, `${params.parties.length} taraf dahil`],
+      summary: [
+        "AI tarafından oluşturulan sözleşme",
+        `Para birimi: ${params.currency}`,
+        `Ülke: ${params.country}`,
+        `${params.parties.length} taraf dahil`,
+      ],
       riskAnalysis: [{ level: "Low", description: "Geliştirme ortamında simüle edildi" }],
     }
   }
