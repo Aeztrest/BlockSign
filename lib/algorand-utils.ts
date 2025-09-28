@@ -1,12 +1,17 @@
 import algosdk from "algosdk"
 
-export async function createAlgorandTransaction(
+export async function writeToAlgorand(
   cid: string,
   walletAddress: string,
-  algodParams: { server: string; port: number; token: string },
-): Promise<any> {
+  signTransaction: (txns: any[]) => Promise<Uint8Array[]>,
+): Promise<string> {
   try {
-    const algodClient = new algosdk.Algodv2(algodParams.token, algodParams.server, algodParams.port)
+    // Algorand TestNet configuration
+    const algodToken = process.env.NEXT_PUBLIC_ALGOD_API_KEY || ""
+    const algodServer = "https://testnet-api.algonode.cloud"
+    const algodPort = 443
+
+    const algodClient = new algosdk.Algodv2(algodToken, algodServer, algodPort)
 
     // Get suggested parameters
     const suggestedParams = await algodClient.getTransactionParams().do()
@@ -20,11 +25,22 @@ export async function createAlgorandTransaction(
       suggestedParams,
     })
 
-    return {
-      txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString("base64"),
-    }
+    // Sign transaction using wallet
+    const signedTxns = await signTransaction([
+      {
+        txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString("base64"),
+      },
+    ])
+
+    // Send transaction
+    const { txId } = await algodClient.sendRawTransaction(signedTxns[0]).do()
+
+    // Wait for confirmation
+    await algosdk.waitForConfirmation(algodClient, txId, 4)
+
+    return txId
   } catch (error) {
-    console.error("Algorand transaction creation error:", error)
-    throw new Error("Algorand işlemi oluşturulurken hata oluştu")
+    console.error("Algorand transaction error:", error)
+    throw new Error("Algorand işlemi sırasında hata oluştu")
   }
 }
