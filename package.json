@@ -12,6 +12,7 @@
     "@google/generative-ai": "latest",
     "@hookform/resolvers": "^3.10.0",
     "@pdf-lib/fontkit": "latest",
+    "@pinata/sdk": "latest",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",
@@ -61,10 +62,10 @@
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.4",
     "sonner": "^1.7.4",
+    "stream": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
-    "web3.storage": "^4.5.5",
     "zod": "3.25.67"
   },
   "devDependencies": {
