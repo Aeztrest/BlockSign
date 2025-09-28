@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bot, FileText, Loader2, CheckCircle, AlertTriangle, Zap, Plus, X, Send, Server } from "lucide-react"
+import { Bot, FileText, Loader2, CheckCircle, AlertTriangle, Upload, Zap, Plus, X, Send } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { WalletGuard } from "@/components/wallet-guard"
 import { useWallet } from "@/lib/wallet-context"
@@ -39,7 +39,7 @@ export default function CreateContractPage() {
   const [inviteMessage, setInviteMessage] = useState("")
 
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null)
-  const [serverFileUrl, setServerFileUrl] = useState<string>("")
+  const [ipfsCid, setIpfsCid] = useState<string>("")
   const [algorandTxId, setAlgorandTxId] = useState<string>("")
   const [stepStatuses, setStepStatuses] = useState<Record<number, "pending" | "in-progress" | "completed" | "error">>({
     0: "pending",
@@ -48,6 +48,7 @@ export default function CreateContractPage() {
     3: "pending",
   })
 
+  // Structured fields
   const [parties, setParties] = useState([{ name: "", address: "" }])
   const [country, setCountry] = useState("")
   const [currency, setCurrency] = useState("TL")
@@ -57,7 +58,7 @@ export default function CreateContractPage() {
   const steps = [
     { title: "Taslak", description: "AI ile oluştur", icon: Bot },
     { title: "PDF", description: "Dışa aktar", icon: FileText },
-    { title: "Sunucu", description: "Yükle", icon: Server },
+    { title: "IPFS", description: "Yükle", icon: Upload },
     { title: "Algorand", description: "Zincire yaz", icon: Zap },
   ]
 
@@ -132,31 +133,31 @@ export default function CreateContractPage() {
           })
           break
 
-        case 2: // Upload to Server
+        case 2: // Upload to IPFS
           if (!pdfBytes) {
             throw new Error("Önce PDF oluşturmalısınız")
           }
 
           toast({
-            title: "Sunucuya Yükleniyor",
-            description: "Sözleşme sunucuya yükleniyor...",
+            title: "IPFS'e Yükleniyor",
+            description: "Sözleşme IPFS ağına yükleniyor...",
           })
 
-          const fileUrl = await uploadToIPFS(pdfBytes, `contract-${Date.now()}.pdf`)
-          setServerFileUrl(fileUrl)
+          const cid = await uploadToIPFS(pdfBytes, `contract-${Date.now()}.pdf`)
+          setIpfsCid(cid)
 
           setStepStatuses((prev) => ({ ...prev, [step]: "completed" }))
           setCurrentStep(2)
 
           toast({
-            title: "Sunucuya Yüklendi",
-            description: `Dosya URL: ${fileUrl}`,
+            title: "IPFS'e Yüklendi",
+            description: `CID: ${cid}`,
           })
           break
 
         case 3: // Create On-chain Record
-          if (!serverFileUrl) {
-            throw new Error("Önce sunucuya yükleme yapmalısınız")
+          if (!ipfsCid) {
+            throw new Error("Önce IPFS'e yükleme yapmalısınız")
           }
 
           if (!wallet?.address) {
@@ -168,7 +169,7 @@ export default function CreateContractPage() {
             description: "Algorand ağında kayıt oluşturuluyor...",
           })
 
-          const txId = await writeToAlgorand(serverFileUrl, wallet.address, wallet.signTransaction)
+          const txId = await writeToAlgorand(ipfsCid, wallet.address, wallet.signTransaction)
           setAlgorandTxId(txId)
 
           setStepStatuses((prev) => ({ ...prev, [step]: "completed" }))
@@ -465,9 +466,7 @@ export default function CreateContractPage() {
                           <div className="flex-1">
                             <h4 className="font-medium">{step.title}</h4>
                             <p className="text-sm text-muted-foreground">{step.description}</p>
-                            {index === 2 && serverFileUrl && (
-                              <p className="text-xs text-emerald-600 mt-1">URL: {serverFileUrl}</p>
-                            )}
+                            {index === 2 && ipfsCid && <p className="text-xs text-emerald-600 mt-1">CID: {ipfsCid}</p>}
                             {index === 3 && algorandTxId && (
                               <p className="text-xs text-emerald-600 mt-1">TxID: {algorandTxId}</p>
                             )}

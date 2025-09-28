@@ -6,10 +6,12 @@ export async function writeToAlgorand(
   signTransaction: (txns: any[]) => Promise<Uint8Array[]>,
 ): Promise<string> {
   try {
-    // Create transaction locally (no API key needed for this)
+    // Algorand TestNet configuration
+    const algodToken = process.env.NEXT_PUBLIC_ALGOD_API_KEY || ""
     const algodServer = "https://testnet-api.algonode.cloud"
     const algodPort = 443
-    const algodClient = new algosdk.Algodv2("", algodServer, algodPort)
+
+    const algodClient = new algosdk.Algodv2(algodToken, algodServer, algodPort)
 
     // Get suggested parameters
     const suggestedParams = await algodClient.getTransactionParams().do()
@@ -30,25 +32,12 @@ export async function writeToAlgorand(
       },
     ])
 
-    // Send to server API for processing
-    const response = await fetch("/api/algorand-transaction", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        cid,
-        walletAddress,
-        signedTxns,
-      }),
-    })
+    // Send transaction
+    const { txId } = await algodClient.sendRawTransaction(signedTxns[0]).do()
 
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || "Algorand işlemi sırasında hata oluştu")
-    }
+    // Wait for confirmation
+    await algosdk.waitForConfirmation(algodClient, txId, 4)
 
-    const { txId } = await response.json()
     return txId
   } catch (error) {
     console.error("Algorand transaction error:", error)
