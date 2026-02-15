@@ -114,3 +114,6 @@ Göktuğ Tunç – gktgtunc@gmail.com
 ✅ AI-enhanced features for real-world impact
 
 ✅ Ready-to-use MVP with intuitive UX
+
+
+tjRpii5pwBFbpXNb42JS-Cigy2BerqQZk72n9g8C9UEcHqmNDuG03xpXnhmH0tFPknHzm3mzH6mkr_isJOsiCg-wiyiDgAA
